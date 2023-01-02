@@ -8,20 +8,38 @@ they actual input parameters/output type may change in future releases.
 import logging
 import os
 from itertools import chain
+import importlib
 
 from django.conf import settings
 from django.contrib.auth import REDIRECT_FIELD_NAME, get_user_model
-from django.contrib.auth.models import AnonymousUser, Group
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ObjectDoesNotExist, PermissionDenied
 from django.db.models import Model, QuerySet
 from django.http import HttpResponseForbidden, HttpResponseNotFound
 from django.shortcuts import render
+from django.apps import apps as django_apps
+from django.core.exceptions import ImproperlyConfigured
 from guardian.conf import settings as guardian_settings
 from guardian.ctypes import get_content_type
 from guardian.exceptions import NotUserNorGroup
 
 logger = logging.getLogger(__name__)
 abspath = lambda *p: os.path.abspath(os.path.join(*p))
+
+
+def get_group_model():
+    """
+    Return the model that matches the guardian settings.
+    """
+    try:
+        group_model_path = getattr(guardian_settings, 'GROUP_MODEL')
+        return django_apps.get_model(group_model_path, require_ready=False)
+    except ValueError as e:
+        raise ImproperlyConfigured("{} must be of the form 'app_label.model_name'".format('GUARDIAN_GROUP_MODEL')) from e
+    except LookupError as e:
+        raise ImproperlyConfigured(
+            "{} refers to model '{}' that has not been installed".format('GUARDIAN_GROUP_MODEL', group_model_path)
+        ) from e
 
 
 def get_anonymous_user():
@@ -73,18 +91,18 @@ def get_identity(identity):
         identity_model_type = identity.model
         if identity_model_type == get_user_model():
             return identity, None
-        elif identity_model_type == Group:
+        elif identity_model_type == get_group_model():
             return None, identity
 
     # get identity from first element in list
     if isinstance(identity, list) and isinstance(identity[0], get_user_model()):
         return identity, None
-    if isinstance(identity, list) and isinstance(identity[0], Group):
+    if isinstance(identity, list) and isinstance(identity[0], get_group_model()):
         return None, identity
 
     if isinstance(identity, get_user_model()):
         return identity, None
-    if isinstance(identity, Group):
+    if isinstance(identity, get_group_model()):
         return None, identity
 
     raise NotUserNorGroup("User/AnonymousUser or Group instance is required "
@@ -138,8 +156,7 @@ def get_40x_or_None(request, perms, obj=None, login_url=None,
                                      redirect_field_name)
 
 
-from django.apps import apps as django_apps
-from django.core.exceptions import ImproperlyConfigured
+
 
 def get_obj_perm_model_by_conf(setting_name):
     """

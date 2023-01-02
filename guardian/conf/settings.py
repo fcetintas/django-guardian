@@ -29,7 +29,7 @@ AUTO_PREFETCH = getattr(settings, 'GUARDIAN_AUTO_PREFETCH', False)
 # Default to using guardian supplied generic object permission models
 USER_OBJ_PERMS_MODEL = getattr(settings, 'GUARDIAN_USER_OBJ_PERMS_MODEL', 'guardian.UserObjectPermission')
 GROUP_OBJ_PERMS_MODEL = getattr(settings, 'GUARDIAN_GROUP_OBJ_PERMS_MODEL', 'guardian.GroupObjectPermission')
-
+GROUP_MODEL = getattr(settings, 'GUARDIAN_GROUP_MODEL', 'django.contrib.auth.models.Group')
 
 def check_configuration():
     if RENDER_403 and RAISE_403:
